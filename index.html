@@ -45,6 +45,10 @@
   }
   a{color:var(--msg);text-decoration:none}
   a:hover{text-decoration:underline}
+  .site-nav{display:flex;justify-content:flex-end;margin-bottom:16px}
+  .site-link{font-family:var(--mono);font-size:11px;color:var(--ink-2);border:1px solid var(--line);
+    padding:6px 10px;border-radius:999px;background:var(--bg-2)}
+  .site-link:hover{color:var(--ink);text-decoration:none;border-color:var(--msg)}
 
   .wrap{max-width:1320px;margin:0 auto;padding:28px 22px 60px}
 
@@ -242,6 +246,9 @@
 </head>
 <body>
 <div class="wrap">
+  <nav class="site-nav" aria-label="Site pages">
+    <a class="site-link" href="/pages/">All pages</a>
+  </nav>
 
   <header class="top">
     <div class="brand">

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pages | apurva9997.github.io</title>
+<meta name="description" content="A directory of pages hosted from apurva9997.github.io." />
+<style>
+  :root{
+    --bg:#101217;
+    --panel:#181c24;
+    --line:#2a303c;
+    --ink:#eef3f8;
+    --muted:#9aa7b5;
+    --accent:#5fb3f5;
+    --accent-2:#f0b45f;
+    --radius:8px;
+    --sans:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    line-height:1.5;
+  }
+  .wrap{max-width:920px;margin:0 auto;padding:40px 20px 56px}
+  .top{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:30px}
+  h1{margin:0;font-size:clamp(28px,5vw,48px);letter-spacing:0;font-weight:750}
+  p{margin:8px 0 0;color:var(--muted);max-width:62ch}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .home{font-family:var(--mono);font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:7px 11px;white-space:nowrap}
+  .home:hover{color:var(--ink);border-color:var(--accent);text-decoration:none}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:24px}
+  .card{display:block;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;min-height:150px}
+  .card:hover{border-color:var(--accent);text-decoration:none}
+  .card strong{display:block;color:var(--ink);font-size:18px;margin-bottom:8px}
+  .card span{display:block;color:var(--muted);font-size:14px}
+  .tag{display:inline-flex;margin-top:18px;font-family:var(--mono);font-size:11px;color:var(--accent-2);border:1px solid var(--line);border-radius:999px;padding:4px 8px}
+  .note{margin-top:28px;border-top:1px solid var(--line);padding-top:18px;font-size:14px;color:var(--muted)}
+  code{font-family:var(--mono);font-size:.94em;color:var(--ink)}
+  @media (max-width:640px){
+    .top{display:block}
+    .home{display:inline-flex;margin-top:16px}
+  }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <div class="top">
+    <div>
+      <h1>Pages</h1>
+      <p>This repo can host many independent GitHub Pages screens. Add each page as its own folder with an <code>index.html</code> file.</p>
+    </div>
+    <a class="home" href="/">Home</a>
+  </div>
+
+  <section class="grid" aria-label="Published pages">
+    <a class="card" href="/">
+      <strong>Assembled Prompt</strong>
+      <span>The current interactive Claude Code prompt playground at the site root.</span>
+      <span class="tag">/</span>
+    </a>
+    <a class="card" href="/pages/example/">
+      <strong>Example Page</strong>
+      <span>A starter page you can duplicate when adding a new standalone page.</span>
+      <span class="tag">/pages/example/</span>
+    </a>
+    <a class="card" href="/pages/agentic-loop/">
+      <strong>The Agentic Loop</strong>
+      <span>An interactive explainer showing how a model and its harness talk through tool calls and results.</span>
+      <span class="tag">/pages/agentic-loop/</span>
+    </a>
+  </section>
+
+  <p class="note">For a cleaner public URL, create folders at the repo root instead, such as <code>/notes/index.html</code> for <code>https://apurva9997.github.io/notes/</code>.</p>
+</main>
+</body>
+</html>

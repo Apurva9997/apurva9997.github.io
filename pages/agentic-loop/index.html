@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>The Agentic Loop — how a model and its harness talk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0c0d10;
+    --bg2:#101116;
+    --panel:#16171b;
+    --panel-hi:#1b1d22;
+    --line:#26282e;
+    --line-soft:#202228;
+    --dash:#2c2e36;
+
+    --ink:#e7e8ea;
+    --dim:#9398a2;
+    --faint:#646973;
+
+    --purple:#a78bfa;   /* tool_use */
+    --purple-bg:#241d3a;
+    --teal:#5eead4;     /* tool_result */
+    --teal-bg:#102b2a;
+    --grey:#3a3d44;     /* plain text msg */
+    --grey-bg:#23252b;
+
+    --lime:#a3e635;     /* tool schema label */
+    --pink:#f0529c;     /* system prompt label */
+    --blue:#56b6f0;     /* user boxes */
+    --orange:#fb7a45;   /* assistant / spark */
+    --yellow:#e5c07b;   /* json strings */
+
+    --ok:#3ad07f;
+    --err:#f0506a;
+    --final:#e6e6e6;
+
+    --mono:"JetBrains Mono","Space Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:"Space Grotesk",ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;background:
+      radial-gradient(1200px 700px at 78% -10%, #15171d 0%, transparent 60%),
+      radial-gradient(900px 600px at 0% 110%, #121319 0%, transparent 55%),
+      var(--bg);
+    color:var(--ink);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+    display:flex;flex-direction:column;overflow:hidden;
+  }
+  .app{display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;height:100vh;height:100dvh;gap:0}
+
+  /* ---------- header ---------- */
+  header{
+    display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+    padding:14px 22px;border-bottom:1px solid var(--line);
+    background:linear-gradient(#101116, #0d0e12);
+  }
+  .brand{display:flex;align-items:center;gap:12px;min-width:0}
+  .brand h1{font-size:16px;font-weight:600;margin:0;letter-spacing:.2px;white-space:nowrap}
+  .brand .sub{font-family:var(--mono);font-size:11px;color:var(--faint);white-space:nowrap}
+  .spark{flex:0 0 auto}
+
+  .legend{display:flex;gap:14px;align-items:center;margin-left:auto;flex-wrap:wrap}
+  .leg{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--dim);font-family:var(--mono)}
+  .leg .sw{width:22px;height:12px;border-radius:3px;border:1px solid}
+  .leg.tu .sw{border-color:var(--purple);background:var(--purple-bg)}
+  .leg.tr .sw{border-color:var(--teal);background:var(--teal-bg)}
+  .leg.tx .sw{border-color:var(--grey);background:var(--grey-bg)}
+  .leg .arr{color:var(--faint)}
+
+  select{
+    font-family:var(--mono);font-size:12px;color:var(--ink);
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:7px 10px;outline:none;cursor:pointer;
+  }
+  select:focus-visible{border-color:var(--orange)}
+
+  /* ---------- loop strip ---------- */
+  .loopbar{display:flex;align-items:center;gap:8px;padding:9px 22px;border-bottom:1px solid var(--line-soft);
+    background:#0e0f13;overflow-x:auto;scrollbar-width:none}
+  .loopbar::-webkit-scrollbar{display:none}
+  .node{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11px;
+    color:var(--faint);padding:5px 11px;border:1px solid var(--line);border-radius:999px;white-space:nowrap;
+    transition:all .25s ease}
+  .node .dot{width:6px;height:6px;border-radius:50%;background:var(--faint);transition:all .25s ease}
+  .node.on{color:var(--ink);border-color:var(--orange);background:rgba(251,122,69,.10)}
+  .node.on .dot{background:var(--orange);box-shadow:0 0 0 4px rgba(251,122,69,.18)}
+  .node.done.on{border-color:var(--ok);background:rgba(58,208,127,.10)}
+  .node.done.on .dot{background:var(--ok);box-shadow:0 0 0 4px rgba(58,208,127,.18)}
+  .loopback{font-family:var(--mono);font-size:11px;color:var(--faint);display:flex;align-items:center;gap:6px;padding-left:4px}
+  .loopback .lp{color:var(--purple)}
+  .chev{color:var(--line);font-size:12px}
+
+  /* ---------- stage ---------- */
+  .stage{display:grid;grid-template-columns:1.05fr .82fr 1.05fr;gap:0;min-height:0}
+  .col{min-height:0;display:flex;flex-direction:column;border-right:1px solid var(--line-soft)}
+  .col:last-child{border-right:none}
+  .col-head{display:flex;align-items:center;gap:9px;padding:10px 16px;border-bottom:1px solid var(--line-soft);
+    background:#0e0f13;flex:0 0 auto}
+  .col-head .tag{font-family:var(--mono);font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--dim)}
+  .col-head .pin{font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-left:auto}
+  .scroll{overflow:auto;padding:16px;flex:1 1 auto;scrollbar-width:thin;scrollbar-color:#2a2c33 transparent}
+  .scroll::-webkit-scrollbar{width:9px}
+  .scroll::-webkit-scrollbar-thumb{background:#23252b;border-radius:9px;border:2px solid var(--bg)}
+
+  /* ---------- terminal (harness) ---------- */
+  .term{font-family:var(--mono);font-size:13px;line-height:1.5}
+  .term .head{display:flex;gap:13px;align-items:flex-start;padding-bottom:14px;margin-bottom:6px;border-bottom:1px dashed var(--dash)}
+  .term .meta{color:var(--faint);font-size:11.5px;line-height:1.55}
+  .term .meta b{color:var(--dim);font-weight:500}
+  .bot{flex:0 0 auto;image-rendering:pixelated}
+  .tline{margin:2px 0;white-space:pre-wrap;word-break:break-word}
+  .tline.prompt{color:var(--ink)}
+  .tline.prompt .car{color:var(--faint);margin-right:8px}
+  .tline.exec{color:var(--faint)}
+  .tline.exec::before{content:"⎯ ";color:var(--line)}
+  .tline.result{display:flex;gap:9px;align-items:baseline;margin-top:1px;margin-bottom:8px}
+  .tline.result .rdot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;margin-top:5px}
+  .rdot.ok{background:var(--ok)} .rdot.err{background:var(--err)} .rdot.final{background:var(--final)}
+  .tline.result .rmain{color:var(--ink)}
+  .tline.result .rsub{color:var(--faint);display:block;font-size:11.5px}
+  .tline.result .rsub::before{content:"└ ";color:var(--line)}
+  .tline.final{display:flex;gap:9px;align-items:baseline;margin-top:12px;padding-top:12px;border-top:1px dashed var(--dash);color:var(--ink)}
+  .tline.final .rdot{width:8px;height:8px;border-radius:50%;background:var(--final);flex:0 0 auto;margin-top:5px}
+  .idle-hint{color:var(--faint);font-family:var(--mono);font-size:12px;margin-top:18px}
+  .idle-hint kbd{font-family:var(--mono)}
+
+  /* ---------- messages column ---------- */
+  .env{border:1px solid var(--grey);background:var(--grey-bg);border-radius:11px;padding:10px 12px;margin:0 0 13px;
+    position:relative;font-family:var(--mono)}
+  .env .elabel{display:flex;align-items:center;justify-content:space-between;gap:8px;
+    font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--faint);margin-bottom:5px}
+  .env .route{display:flex;align-items:center;gap:6px;color:var(--faint);font-size:10px}
+  .env .ebody{font-size:12.5px;color:var(--ink);word-break:break-word;line-height:1.45}
+  .env .ebody .k{color:var(--yellow)}
+  .env.tool_use{border-color:var(--purple);background:var(--purple-bg)}
+  .env.tool_use .elabel{color:var(--purple)}
+  .env.tool_result{border-color:var(--teal);background:var(--teal-bg)}
+  .env.tool_result .elabel{color:var(--teal)}
+  .env.tool_result.err{border-color:var(--err);background:#2a161c}
+  .env.tool_result.err .elabel{color:var(--err)}
+  .env .dirtab{position:absolute;top:50%;transform:translateY(-50%);font-size:15px;color:inherit;opacity:.55}
+  .env.dir-left .dirtab{left:-9px}
+  .env.dir-right .dirtab{right:-9px}
+  .env.tool_use .dirtab{color:var(--purple)}
+  .env.tool_result .dirtab{color:var(--teal)}
+  .env.tool_result.err .dirtab{color:var(--err)}
+  .env.text .dirtab{color:var(--faint)}
+
+  /* ---------- model column ---------- */
+  .card{border:1px solid var(--line);background:var(--panel-hi);border-radius:13px;padding:13px 14px 12px;margin:0 0 14px;
+    display:flex;gap:11px;align-items:flex-start}
+  .card .reason{font-family:var(--sans);font-style:italic;font-size:13.5px;line-height:1.5;color:#dcdee2}
+  .card .reason .ln{margin:0 0 5px}
+  .card .act{font-family:var(--mono);font-size:12.5px;font-weight:500;margin-top:9px;display:flex;align-items:center;gap:8px}
+  .card .act.tool{color:var(--purple)}
+  .card .act.final{color:var(--ok)}
+  .card .act .ic{font-size:13px}
+
+  /* ---------- controls ---------- */
+  .controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:11px 22px;border-top:1px solid var(--line);background:#0e0f13}
+  .btn{font-family:var(--sans);font-size:13px;font-weight:500;color:var(--ink);background:var(--panel);
+    border:1px solid var(--line);border-radius:9px;padding:9px 14px;cursor:pointer;display:flex;align-items:center;gap:7px;
+    transition:border-color .15s,background .15s}
+  .btn:hover{border-color:#3a3d44}
+  .btn:active{transform:translateY(1px)}
+  .btn:disabled{opacity:.38;cursor:default}
+  .btn.primary{background:var(--orange);border-color:var(--orange);color:#1a0d06;font-weight:600}
+  .btn.primary:hover{background:#ff8a59}
+  .btn.ghost{background:transparent}
+  .btn.on{border-color:var(--orange);color:var(--orange)}
+  .counter{font-family:var(--mono);font-size:12px;color:var(--dim);margin-left:4px}
+  .counter b{color:var(--ink);font-weight:500}
+  .spacer{flex:1 1 auto}
+  .ctx{font-family:var(--mono);font-size:11.5px;color:var(--faint);display:flex;align-items:center;gap:7px}
+  .ctx b{color:var(--orange);font-weight:600}
+  .speed{display:flex;align-items:center;gap:0;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .speed button{font-family:var(--mono);font-size:11px;color:var(--dim);background:transparent;border:none;padding:8px 9px;cursor:pointer}
+  .speed button.on{background:var(--panel);color:var(--ink)}
+
+  /* ---------- status ---------- */
+  .status{display:flex;align-items:center;gap:12px;padding:0 22px 13px;background:#0e0f13}
+  .phasechip{font-family:var(--mono);font-size:10px;letter-spacing:.6px;text-transform:uppercase;
+    padding:4px 9px;border-radius:6px;border:1px solid var(--line);color:var(--dim);flex:0 0 auto}
+  .phasechip[data-p="assemble"]{color:var(--blue);border-color:rgba(86,182,240,.4)}
+  .phasechip[data-p="return"]{color:var(--purple);border-color:rgba(167,139,250,.4)}
+  .phasechip[data-p="execute"]{color:var(--teal);border-color:rgba(94,234,212,.4)}
+  .phasechip[data-p="done"]{color:var(--ok);border-color:rgba(58,208,127,.4)}
+  .statustext{font-size:13.5px;color:var(--dim);line-height:1.45}
+  .statustext em{color:var(--ink);font-style:normal;font-weight:600}
+
+  /* ---------- assembled prompt inspector ---------- */
+  .inspector{border-top:1px solid var(--line);background:#0b0c0f;max-height:0;overflow:hidden;transition:max-height .28s ease}
+  .inspector.open{max-height:40vh}
+  .inspector .ibody{padding:16px 22px;overflow:auto;max-height:40vh;scrollbar-width:thin}
+  .inote{font-size:12.5px;color:var(--dim);margin:0 0 14px;line-height:1.5;max-width:880px}
+  .inote em{color:var(--orange);font-style:normal;font-weight:600}
+  .assembled{border:1px solid var(--line);border-radius:14px;background:#15171c;padding:14px;display:flex;flex-direction:column;gap:11px}
+  .arow{display:flex;gap:12px;align-items:stretch}
+  .vlabel{writing-mode:vertical-rl;transform:rotate(180deg);font-family:var(--mono);font-size:10px;letter-spacing:1px;
+    text-transform:uppercase;text-align:center;padding:2px;flex:0 0 auto;font-weight:700}
+  .vlabel.tools{color:var(--lime)} .vlabel.sys{color:var(--pink)} .vlabel.msgs{color:var(--dim)}
+  .arow .inner{flex:1 1 auto;display:flex;flex-wrap:wrap;gap:8px;background:#1b1d23;border-radius:10px;padding:10px}
+  .chip{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--ink);background:#272a31;border-radius:8px;
+    padding:9px 14px;border:1px solid #30333b}
+  .chip.soft{font-weight:400;color:var(--dim)}
+  .sysblock{font-family:var(--mono);font-size:12px;color:var(--dim);background:#272a31;border-radius:8px;padding:10px 12px;width:100%}
+  .imsg{border-radius:9px;padding:9px 11px;font-family:var(--mono);font-size:12px;width:100%;border:1px solid}
+  .imsg.user{border-color:rgba(86,182,240,.55);background:rgba(86,182,240,.05)}
+  .imsg.assistant{border-color:rgba(251,122,69,.55);background:rgba(251,122,69,.05)}
+  .imsg .ml{font-size:10px;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px}
+  .imsg.user .ml{color:var(--blue)} .imsg.assistant .ml{color:var(--orange)}
+  .imsg .mt{color:var(--ink);word-break:break-word}
+  .imsg .firstbits{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+  .firstbits .b{background:#272a31;border-radius:7px;padding:7px 10px;font-size:11px}
+  .firstbits .b small{display:block;color:var(--faint);font-size:9.5px}
+
+  /* ---------- entrance animation ---------- */
+  @keyframes inLeft{from{opacity:0;transform:translateX(26px)}to{opacity:1;transform:translateX(0)}}
+  @keyframes inRight{from{opacity:0;transform:translateX(-26px)}to{opacity:1;transform:translateX(0)}}
+  @keyframes inUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes glow{0%{box-shadow:0 0 0 0 rgba(251,122,69,.0)}30%{box-shadow:0 0 0 3px rgba(251,122,69,.22)}100%{box-shadow:0 0 0 0 rgba(251,122,69,0)}}
+  .is-new.dir-left{animation:inLeft .42s cubic-bezier(.2,.8,.2,1)}
+  .is-new.dir-right{animation:inRight .42s cubic-bezier(.2,.8,.2,1)}
+  .is-new.up{animation:inUp .34s ease}
+  .env.is-new{animation:inLeft .42s cubic-bezier(.2,.8,.2,1), glow .9s ease}
+  .env.is-new.dir-right{animation:inRight .42s cubic-bezier(.2,.8,.2,1), glow .9s ease}
+  .card.is-new{animation:inLeft .42s cubic-bezier(.2,.8,.2,1)}
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation:none !important;transition:none !important}
+  }
+  @media (max-width:920px){
+    .stage{grid-template-columns:1fr}
+    .col{border-right:none;border-bottom:1px solid var(--line-soft)}
+    .legend{width:100%;margin-left:0}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <span class="spark" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <g stroke="#fb7a45" stroke-width="2" stroke-linecap="round">
+          <line x1="12" y1="3" x2="12" y2="21"/><line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="5.5" y1="5.5" x2="18.5" y2="18.5"/><line x1="18.5" y1="5.5" x2="5.5" y2="18.5"/>
+        </g>
+      </svg>
+    </span>
+    <div class="brand">
+      <h1>The Agentic Loop</h1>
+      <span class="sub">how a model and its harness talk · tool_use ⇄ tool_result</span>
+    </div>
+
+    <div class="legend">
+      <select id="scenario" title="Pick a scenario"></select>
+      <span class="leg tx"><span class="sw"></span>message</span>
+      <span class="leg tu"><span class="sw"></span>tool_use <span class="arr">◀ to harness</span></span>
+      <span class="leg tr"><span class="sw"></span>tool_result <span class="arr">to model ▶</span></span>
+    </div>
+  </header>
+
+  <!-- loop strip -->
+  <div class="loopbar" id="loopbar">
+    <span class="node" data-node="assemble"><span class="dot"></span>Assemble prompt</span>
+    <span class="chev">›</span>
+    <span class="node" data-node="assemble"><span class="dot"></span>Send to API</span>
+    <span class="chev">›</span>
+    <span class="node" data-node="return"><span class="dot"></span>Model reasons</span>
+    <span class="chev">›</span>
+    <span class="node" data-node="return"><span class="dot"></span>Returns tool_use / text</span>
+    <span class="chev">›</span>
+    <span class="node" data-node="execute"><span class="dot"></span>Harness executes</span>
+    <span class="loopback"><span class="lp">↺</span> loop while tool_use</span>
+    <span class="chev">›</span>
+    <span class="node done" data-node="done"><span class="dot"></span>Done on plain text</span>
+  </div>
+
+  <!-- stage -->
+  <div class="stage">
+    <section class="col" id="col-term">
+      <div class="col-head"><span class="tag">Harness · Claude Code</span><span class="pin">runs on your machine</span></div>
+      <div class="scroll term" id="terminal"></div>
+    </section>
+
+    <section class="col" id="col-msgs">
+      <div class="col-head"><span class="tag">Messages on the wire</span><span class="pin" id="wirecount"></span></div>
+      <div class="scroll" id="messages"></div>
+    </section>
+
+    <section class="col" id="col-model">
+      <div class="col-head"><span class="tag">Anthropic API · Model</span><span class="pin">stateless · sees only the prompt</span></div>
+      <div class="scroll" id="model"></div>
+    </section>
+  </div>
+
+  <!-- controls -->
+  <div class="controls">
+    <button class="btn ghost" id="reset" title="Reset (R)">↺ Reset</button>
+    <button class="btn" id="prev" title="Previous (←)">◀ Prev</button>
+    <button class="btn primary" id="next" title="Next (→ or Space)">Next ▶</button>
+    <button class="btn" id="auto" title="Auto-play (A)">▶ Auto</button>
+    <div class="speed" id="speed" title="Auto-play speed">
+      <button data-ms="1900">slow</button>
+      <button data-ms="1150" class="on">normal</button>
+      <button data-ms="650">fast</button>
+    </div>
+    <span class="counter">step <b id="stepnum">0</b> / <span id="stepmax">0</span></span>
+    <div class="spacer"></div>
+    <span class="ctx">context: <b id="ctxcount">0</b> messages re-sent every turn</span>
+    <button class="btn" id="inspect" title="Inspect the assembled prompt (P)">⌄ Assembled prompt</button>
+  </div>
+
+  <!-- status -->
+  <div class="status">
+    <span class="phasechip" id="phasechip" data-p="">idle</span>
+    <span class="statustext" id="statustext">Press <em>Next</em> (or →) to send the first prompt. Each click advances the loop by one beat.</span>
+  </div>
+
+  <!-- assembled prompt inspector -->
+  <div class="inspector" id="inspector">
+    <div class="ibody">
+      <p class="inote">This is the <em>entire</em> payload sent to the model on the current turn — tool schemas, the system prompt, and every message so far. The model keeps no state between calls, so <em>the whole thing is re-sent each loop</em> and only ever grows.</p>
+      <div class="assembled" id="assembled"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---- tiny helpers --------------------------------------------------------
+  var esc = function(s){return String(s).replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];});};
+  // highlight "string" literals in json-ish previews
+  function jsonish(s){
+    return esc(s).replace(/&quot;|"([^"]*)"/g, function(m,g){ return '"<span class="k">'+ (g===undefined?'':esc(g)) +'</span>"'; });
+  }
+
+  // ---- pixel bot (orange) --------------------------------------------------
+  var BOT = '<svg class="bot" width="46" height="40" viewBox="0 0 23 20" shape-rendering="crispEdges">'
+    +'<rect x="3" y="2" width="17" height="3" fill="#e8794a"/>'
+    +'<rect x="2" y="5" width="19" height="9" fill="#e8794a"/>'
+    +'<rect x="4" y="14" width="3" height="3" fill="#e8794a"/>'
+    +'<rect x="16" y="14" width="3" height="3" fill="#e8794a"/>'
+    +'<rect x="6" y="7" width="2" height="4" fill="#14110d"/>'
+    +'<rect x="15" y="7" width="2" height="4" fill="#14110d"/>'
+    +'</svg>';
+  var TERM_HEAD = '<div class="head">'+BOT+'<div class="meta">'
+    +'<b>Claude Code</b> v2.1.x<br>Opus 4.7 · xhigh effort · Claude Max<br>~/Desktop/frontend-masters</div></div>';
+
+  // ---- scenarios -----------------------------------------------------------
+  // event kinds: prompt | model | exec
+  var SCENARIOS = {
+    test: {
+      name: "Add a test for calc (self-correcting loop)",
+      prompt: "Add a test for calc in utils.ts",
+      events: [
+        { kind:"prompt", text:"Add a test for calc in utils.ts",
+          wire:"Add a test for calc…",
+          status:"You type a prompt. The harness wraps it as the <em>first user message</em> and assembles the prompt." },
+
+        { kind:"model",
+          reason:["Asked to add a test for calc.","I don't know its signature — I'll read the file first."],
+          action:{type:"tool", name:"Read", preview:'Read { path: "src/utils.ts" }', emit:"Emit Read tool call"},
+          status:"The model can't touch your disk. It <em>emits a tool_use block and stops</em> — the harness has to run it." },
+        { kind:"exec", cmd:'fs.readFileSync("src/utils.ts")', title:"Read(src/utils.ts)", sub:"Read 11 lines", dot:"ok",
+          wire:'"function calc(a, b)…"',
+          status:"Now the harness runs the tool locally and feeds the output back as a <em>tool_result</em>." },
+
+        { kind:"model",
+          reason:["calc(a, b) returns a + b. Simple addition.","I'll write the test into the file."],
+          action:{type:"tool", name:"Write", preview:"Write { path, content }", emit:"Emit Write tool call"},
+          status:"With the file in context, the model plans the edit and emits the next tool_use." },
+        { kind:"exec", cmd:'fs.writeFileSync("src/utils.ts", … )', title:"Write(src/utils.ts)", sub:"Wrote 5 lines to src/utils.ts", dot:"ok",
+          wire:"Wrote 5 lines to src/utils.ts",
+          status:"Harness writes the file and returns the result. The transcript just grew again." },
+
+        { kind:"model",
+          reason:["File written. Run it to verify."],
+          action:{type:"tool", name:"Bash", preview:'Bash { command: "npm test" }', emit:"Emit Bash tool call"},
+          status:"A good agent verifies its own work — the model asks the harness to run the tests." },
+        { kind:"exec", cmd:"npm test", title:"Ran 1 bash command", sub:"1 failing", dot:"err",
+          wire:"{ is_error: true, … }",
+          status:"It <em>fails</em> — and that's fine. Errors go back as tool_results too, so the model can self-correct." },
+
+        { kind:"model",
+          reason:["Failed — expected 5, received 4.","My assertion was wrong; 2 + 2 is 4. Fix the expected value."],
+          action:{type:"tool", name:"Edit", preview:"Edit { path, old_str, new_str }", emit:"Emit Edit tool call"},
+          status:"The model reads the failure, diagnoses its own mistake, and emits an Edit to fix it." },
+        { kind:"exec", cmd:'fs.writeFileSync("src/utils.ts", … )', title:"Update(src/utils.ts)", sub:"Added 2 lines, removed 2 lines", dot:"ok",
+          wire:'"Successfully updated …"',
+          status:"Harness applies the edit and returns success." },
+
+        { kind:"model",
+          reason:["Edit applied. Re-run to confirm."],
+          action:{type:"tool", name:"Bash", preview:'Bash { command: "npm test" }', emit:"Emit Bash tool call"},
+          status:"Don't assume — re-run. The model loops back to Bash to confirm the fix." },
+        { kind:"exec", cmd:"npm test", title:"Ran 1 bash command", sub:"1 passing", dot:"ok",
+          wire:"{ is_error: false, … }",
+          status:"Exit 0. The result comes back clean — the model now has what it needs to stop." },
+
+        { kind:"model",
+          reason:["Exit 0, test passes. Nothing left to do.","Return a summary."],
+          action:{type:"final", text:"I added a test for calc in src/utils.ts."},
+          status:"This turn the model returns <em>plain text with no tool_use</em> — that's the signal that ends the loop." }
+      ]
+    },
+
+    quick: {
+      name: "Quick question (no tools, one turn)",
+      prompt: "What's the time complexity of binary search?",
+      events: [
+        { kind:"prompt", text:"What's the time complexity of binary search?",
+          wire:"What's the time complexity…",
+          status:"Same machinery: your text becomes the first user message and the prompt is assembled." },
+        { kind:"model",
+          reason:["This is general knowledge — no files, no commands needed.","I can answer directly."],
+          action:{type:"final", text:"O(log n) — each comparison halves the remaining search space."},
+          status:"Not every prompt triggers the loop. With no tool_use, the model answers and the loop ends immediately." }
+      ]
+    }
+  };
+
+  // ---- build cumulative view-state from events[0..upto] --------------------
+  function build(scn, upto){
+    var st = {
+      term:[], envs:[], cards:[], ctx:[],
+      turn:0, phase:"idle", node:null, status:"", wireCount:0
+    };
+    if(upto < 0) return st;
+    var aN=0, uN=0;
+    for(var k=0;k<=upto && k<scn.events.length;k++){
+      var e = scn.events[k];
+      if(e.kind==="prompt"){
+        uN++;
+        st.term.push({type:"prompt", text:e.text});
+        st.envs.push({variant:"text", dir:"right", label:"message", route:"You ▶ Model", body:esc(e.wire||e.text)});
+        st.ctx.push({role:"user", label:"User "+uN, text:e.text, first:true});
+        st.turn=1; st.phase="assemble"; st.node="assemble";
+      } else if(e.kind==="model"){
+        st.cards.push({reason:e.reason, action:e.action});
+        if(e.action.type==="tool"){
+          aN++;
+          st.envs.push({variant:"tool_use", dir:"left", label:"tool_use", route:"Model ◀ Harness", body:jsonish(e.action.preview)});
+          st.ctx.push({role:"assistant", label:"Assistant "+aN,
+            text:'{ type:"tool_use", name:"'+e.action.name+'", … }', tool:true});
+          st.phase="return"; st.node="return";
+        } else {
+          aN++;
+          st.envs.push({variant:"text", dir:"left", label:"message", route:"Model ◀ Harness", body:esc(e.action.text)});
+          st.ctx.push({role:"assistant", label:"Assistant "+aN, text:e.action.text});
+          st.term.push({type:"final", text:e.action.text});
+          st.phase="done"; st.node="done";
+        }
+      } else if(e.kind==="exec"){
+        uN++;
+        st.term.push({type:"exec", cmd:e.cmd});
+        st.term.push({type:"result", title:e.title, sub:e.sub, dot:e.dot});
+        st.envs.push({variant:"tool_result", err:e.dot==="err", dir:"right", label:"tool_result", route:"Harness ▶ Model", body:jsonish(e.wire)});
+        st.ctx.push({role:"user", label:"User "+uN, text:e.wire, toolResult:true});
+        st.turn++; st.phase="execute"; st.node="execute";
+      }
+      st.status = e.status;
+    }
+    st.wireCount = st.envs.length;
+    return st;
+  }
+
+  // ---- render --------------------------------------------------------------
+  var state = { scnId:"test", step:-1, autoMs:1150, autoTimer:null, inspectorOpen:false };
+
+  function renderTerminal(st, newFrom){
+    var html = TERM_HEAD;
+    st.term.forEach(function(t,i){
+      var fresh = i>=newFrom ? " is-new up" : "";
+      if(t.type==="prompt"){
+        html += '<div class="tline prompt'+fresh+'"><span class="car">›</span>'+esc(t.text)+'</div>';
+      } else if(t.type==="exec"){
+        html += '<div class="tline exec'+fresh+'">'+esc(t.cmd)+'</div>';
+      } else if(t.type==="result"){
+        html += '<div class="tline result'+fresh+'"><span class="rdot '+t.dot+'"></span><span class="rmain">'+esc(t.title)+'<span class="rsub">'+esc(t.sub)+'</span></span></div>';
+      } else if(t.type==="final"){
+        html += '<div class="tline final'+fresh+'"><span class="rdot"></span><span>'+esc(t.text)+'</span></div>';
+      }
+    });
+    if(st.term.length===0){
+      html += '<div class="idle-hint">Waiting for a prompt. Hit <kbd>Next ▶</kbd> to begin.</div>';
+    }
+    var el = document.getElementById("terminal");
+    el.innerHTML = html;
+    scrollNew(el);
+  }
+
+  function renderMessages(st, newFrom){
+    var html = "";
+    st.envs.forEach(function(m,i){
+      var fresh = i>=newFrom ? " is-new" : "";
+      var errc = m.err ? " err" : "";
+      var arrow = m.dir==="left" ? "◀" : "▶";
+      html += '<div class="env '+m.variant+errc+' dir-'+m.dir+fresh+'">'
+            +   '<span class="dirtab">'+arrow+'</span>'
+            +   '<div class="elabel"><span>'+m.label+'</span><span class="route">'+m.route+'</span></div>'
+            +   '<div class="ebody">'+m.body+'</div>'
+            + '</div>';
+    });
+    if(st.envs.length===0) html = '<div class="idle-hint" style="font-family:var(--mono);color:var(--faint);font-size:12px">Each message — text, tool_use, or tool_result — appears here as it crosses the wire.</div>';
+    var el = document.getElementById("messages");
+    el.innerHTML = html;
+    document.getElementById("wirecount").textContent = st.envs.length ? (st.envs.length+" so far") : "";
+    scrollNew(el);
+  }
+
+  function renderModel(st, newFrom){
+    var html = "";
+    st.cards.forEach(function(c,i){
+      var fresh = i>=newFrom ? " is-new" : "";
+      var spark = '<svg width="16" height="16" viewBox="0 0 24 24" style="flex:0 0 auto;margin-top:2px"><g stroke="#fb7a45" stroke-width="2.1" stroke-linecap="round"><line x1="12" y1="3" x2="12" y2="21"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="5.5" y1="5.5" x2="18.5" y2="18.5"/><line x1="18.5" y1="5.5" x2="5.5" y2="18.5"/></g></svg>';
+      var reason = c.reason.map(function(l){return '<div class="ln">'+esc(l)+'</div>';}).join("");
+      var act = c.action.type==="tool"
+        ? '<div class="act tool"><span class="ic">→</span>'+esc(c.action.emit)+'</div>'
+        : '<div class="act final"><span class="ic">✓</span>Return plain text — no tool call</div>';
+      html += '<div class="card'+fresh+'">'+spark+'<div><div class="reason">'+reason+'</div>'+act+'</div></div>';
+    });
+    if(st.cards.length===0) html = '<div class="idle-hint" style="font-family:var(--mono);color:var(--faint);font-size:12px">The model\'s reasoning and its returned block (tool_use or text) show up here.</div>';
+    var el = document.getElementById("model");
+    el.innerHTML = html;
+    scrollNew(el);
+  }
+
+  function renderLoop(st){
+    document.querySelectorAll("#loopbar .node").forEach(function(n){
+      n.classList.toggle("on", n.getAttribute("data-node")===st.node);
+    });
+  }
+
+  function renderInspector(st){
+    var tools = ["Bash","Edit","Read","Write","WebFetch","Agent"];
+    var chips = tools.map(function(t){return '<span class="chip">'+t+'</span>';}).join("")
+      + '<span class="chip soft">mcp_…*</span><span class="chip soft">mcp_…*</span>';
+    var sys = '<div class="inner"><div class="sysblock">You are Claude Code, Anthropic\'s CLI for agentic coding…</div>'
+      + '<span class="chip">Environment <span style="color:var(--faint);font-weight:400">(cwd, platform)</span></span>'
+      + '<span class="chip">Tone</span></div>';
+
+    var msgs = st.ctx.map(function(m){
+      var cls = m.role==="user" ? "user" : "assistant";
+      var inner="";
+      if(m.first){
+        inner = '<div class="firstbits">'
+              + '<span class="b">CLAUDE.md <small>if it exists</small></span>'
+              + '<span class="b">Available skills <small>name + description</small></span></div>'
+              + '<div class="mt">'+esc(m.text)+'</div>';
+      } else {
+        inner = '<div class="mt">'+esc(m.text)+'</div>';
+      }
+      return '<div class="imsg '+cls+'"><div class="ml">'+m.label+'</div>'+inner+'</div>';
+    }).join("");
+    if(!msgs) msgs = '<div class="sysblock" style="width:100%">No messages yet.</div>';
+
+    document.getElementById("assembled").innerHTML =
+        '<div class="arow"><span class="vlabel tools">Tool Schema</span><div class="inner">'+chips+'</div></div>'
+      + '<div class="arow"><span class="vlabel sys">System Prompt</span>'+sys+'</div>'
+      + '<div class="arow"><span class="vlabel msgs">Messages</span><div class="inner" style="flex-direction:column">'+msgs+'</div></div>';
+  }
+
+  function scrollNew(el){
+    var n = el.querySelector(".is-new");
+    if(n) n.scrollIntoView({block:"nearest", behavior:"smooth"});
+    else el.scrollTop = el.scrollHeight;
+  }
+
+  function render(){
+    var scn = SCENARIOS[state.scnId];
+    var st = build(scn, state.step);
+    var prev = build(scn, state.step-1);
+
+    renderTerminal(st, prev.term.length);
+    renderMessages(st, prev.envs.length);
+    renderModel(st, prev.cards.length);
+    renderLoop(st);
+    renderInspector(st);
+
+    // status + chips + counters
+    var chip = document.getElementById("phasechip");
+    chip.setAttribute("data-p", st.phase);
+    chip.textContent = ({assemble:"assemble",return:"model → return",execute:"harness → execute",done:"done",idle:"idle"})[st.phase] || st.phase;
+    document.getElementById("statustext").innerHTML = state.step<0
+      ? 'Press <em>Next</em> (or →) to send the first prompt. Each click advances the loop by one beat.'
+      : st.status;
+    document.getElementById("stepnum").textContent = state.step+1;
+    document.getElementById("ctxcount").textContent = st.ctx.length;
+
+    // controls
+    document.getElementById("prev").disabled = state.step < 0;
+    document.getElementById("next").disabled = state.step >= scn.events.length-1;
+    if(state.step >= scn.events.length-1) stopAuto();
+  }
+
+  // ---- navigation ----------------------------------------------------------
+  function maxStep(){ return SCENARIOS[state.scnId].events.length-1; }
+  function next(){ if(state.step<maxStep()){ state.step++; render(); } else stopAuto(); }
+  function prev(){ if(state.step>=0){ state.step--; render(); } }
+  function reset(){ stopAuto(); state.step=-1; render(); }
+
+  function startAuto(){
+    if(state.autoTimer) return;
+    if(state.step>=maxStep()) state.step=-1;
+    document.getElementById("auto").classList.add("on");
+    document.getElementById("auto").innerHTML = "⏸ Pause";
+    next();
+    state.autoTimer = setInterval(function(){
+      if(state.step>=maxStep()){ stopAuto(); return; }
+      next();
+    }, state.autoMs);
+  }
+  function stopAuto(){
+    if(state.autoTimer){ clearInterval(state.autoTimer); state.autoTimer=null; }
+    var b=document.getElementById("auto"); b.classList.remove("on"); b.innerHTML="▶ Auto";
+  }
+  function toggleAuto(){ state.autoTimer ? stopAuto() : startAuto(); }
+
+  // ---- wiring --------------------------------------------------------------
+  function initScenarioSelect(){
+    var sel = document.getElementById("scenario");
+    Object.keys(SCENARIOS).forEach(function(id){
+      var o=document.createElement("option"); o.value=id; o.textContent=SCENARIOS[id].name; sel.appendChild(o);
+    });
+    sel.value = state.scnId;
+    sel.addEventListener("change", function(){ state.scnId=sel.value; reset(); });
+  }
+
+  document.getElementById("next").addEventListener("click", function(){ stopAuto(); next(); });
+  document.getElementById("prev").addEventListener("click", function(){ stopAuto(); prev(); });
+  document.getElementById("reset").addEventListener("click", reset);
+  document.getElementById("auto").addEventListener("click", toggleAuto);
+  document.getElementById("inspect").addEventListener("click", function(){
+    state.inspectorOpen=!state.inspectorOpen;
+    document.getElementById("inspector").classList.toggle("open", state.inspectorOpen);
+    this.classList.toggle("on", state.inspectorOpen);
+    this.innerHTML = (state.inspectorOpen?"⌃":"⌄")+" Assembled prompt";
+  });
+  document.querySelectorAll("#speed button").forEach(function(b){
+    b.addEventListener("click", function(){
+      document.querySelectorAll("#speed button").forEach(function(x){x.classList.remove("on");});
+      b.classList.add("on"); state.autoMs=parseInt(b.getAttribute("data-ms"),10);
+      if(state.autoTimer){ stopAuto(); startAuto(); }
+    });
+  });
+
+  document.addEventListener("keydown", function(ev){
+    if(ev.target && /^(INPUT|SELECT|TEXTAREA)$/.test(ev.target.tagName)) return;
+    var k=ev.key;
+    if(k==="ArrowRight"||k===" "){ ev.preventDefault(); stopAuto(); next(); }
+    else if(k==="ArrowLeft"){ ev.preventDefault(); stopAuto(); prev(); }
+    else if(k==="r"||k==="R"){ reset(); }
+    else if(k==="a"||k==="A"){ toggleAuto(); }
+    else if(k==="p"||k==="P"){ document.getElementById("inspect").click(); }
+    else if(k==="Home"){ stopAuto(); state.step=-1; render(); }
+    else if(k==="End"){ stopAuto(); while(state.step<maxStep()){state.step++;} render(); }
+  });
+
+  document.getElementById("stepmax").textContent = "?";
+  initScenarioSelect();
+  document.getElementById("stepmax").textContent = SCENARIOS[state.scnId].events.length;
+  document.getElementById("scenario").addEventListener("change", function(){
+    document.getElementById("stepmax").textContent = SCENARIOS[state.scnId].events.length;
+  });
+  reset();
+})();
+</script>
+</body>
+</html>
