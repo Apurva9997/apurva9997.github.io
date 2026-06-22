@@ -9,6 +9,7 @@ Current structure:
   index.html              # Current deployed root page
   pages/
     index.html            # Directory of available pages
+    agentic-loop.html     # Redirect for /pages/agentic-loop
     agentic-loop/
       index.html          # The Agentic Loop interactive explainer
     example/
