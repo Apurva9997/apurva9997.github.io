@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Assembled Prompt — a Claude Code playground</title>
+<meta name="description" content="An interactive playground showing how Claude Code turns your short terminal message into a full assembled prompt: tool schema, system prompt, and messages." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0d12;
+    --bg-2:#0e131a;
+    --panel:#141a22;
+    --panel-2:#1a212b;
+    --block:#222b36;
+    --block-hi:#2b3744;
+    --line:#2a333f;
+    --line-soft:#222a34;
+    --ink:#e7eef6;
+    --ink-2:#9fb0c2;
+    --ink-3:#6b7d90;
+    --tool:#b6cc4e;     /* tool schema  */
+    --sys:#ef6aa6;      /* system prompt */
+    --msg:#4fa3f2;      /* messages */
+    --amber:#f1a45f;    /* terminal prompt */
+    --user:#4fa3f2;
+    --radius:14px;
+    --mono:"Space Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+    --sans:"Space Grotesk",system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:
+      radial-gradient(1200px 600px at 85% -10%, rgba(79,163,242,.06), transparent 60%),
+      radial-gradient(900px 500px at 5% 110%, rgba(239,106,166,.05), transparent 55%),
+      var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+    line-height:1.5;
+    min-height:100vh;
+  }
+  a{color:var(--msg);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  .wrap{max-width:1320px;margin:0 auto;padding:28px 22px 60px}
+
+  /* ---------- header ---------- */
+  header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:22px}
+  .brand{display:flex;align-items:center;gap:14px}
+  .crab{width:42px;height:42px;flex:0 0 auto;image-rendering:pixelated}
+  .title h1{font-size:clamp(20px,2.6vw,28px);margin:0;letter-spacing:-.02em;font-weight:700}
+  .title h1 .accent{color:var(--amber)}
+  .title p{margin:2px 0 0;color:var(--ink-2);font-size:13.5px;max-width:60ch}
+  .hdr-tag{font-family:var(--mono);font-size:11px;color:var(--ink-3);border:1px solid var(--line);
+    padding:4px 9px;border-radius:999px;white-space:nowrap}
+
+  /* ---------- layout ---------- */
+  .grid{display:grid;grid-template-columns:minmax(0,0.92fr) minmax(0,1.08fr);gap:20px}
+  @media (max-width:980px){ .grid{grid-template-columns:1fr} }
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius)}
+  .panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:12px 16px;border-bottom:1px solid var(--line-soft)}
+  .panel-head .lbl{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+
+  /* ---------- terminal (left top) ---------- */
+  .term{overflow:hidden}
+  .term .bar{display:flex;align-items:center;gap:7px;padding:11px 14px;border-bottom:1px solid var(--line-soft);background:var(--bg-2)}
+  .dot{width:11px;height:11px;border-radius:50%}
+  .dot.r{background:#ff5f56}.dot.y{background:#ffbd2e}.dot.g{background:#27c93f}
+  .term .bar .path{margin-left:8px;font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+  .term-body{padding:16px 16px 14px;font-family:var(--mono);font-size:13px}
+  .session{display:flex;gap:12px;color:var(--ink-3);margin-bottom:14px;line-height:1.55}
+  .session .meta b{color:var(--ink-2);font-weight:400}
+  .session .crab2{width:34px;height:34px;image-rendering:pixelated;flex:0 0 auto;margin-top:2px}
+  .prompt-line{display:flex;align-items:center;gap:9px;border:1px solid var(--line);border-radius:10px;
+    padding:10px 12px;background:var(--bg-2)}
+  .prompt-line .chev{color:var(--amber);font-weight:700}
+  .prompt-line input{flex:1;background:transparent;border:0;outline:0;color:var(--ink);
+    font-family:var(--mono);font-size:13px;caret-color:var(--amber)}
+  .prompt-line input::placeholder{color:var(--ink-3)}
+  .send-hint{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);margin-top:8px;display:flex;justify-content:space-between}
+
+  /* ---------- controls (left bottom) ---------- */
+  .controls{margin-top:18px;padding:4px 2px}
+  .ctrl-grp{padding:14px 16px;border-bottom:1px solid var(--line-soft)}
+  .ctrl-grp:last-child{border-bottom:0}
+  .ctrl-grp h3{margin:0 0 3px;font-size:13px;font-weight:600;letter-spacing:-.01em}
+  .ctrl-grp .sub{margin:0 0 11px;font-size:12px;color:var(--ink-3)}
+
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;flex-wrap:wrap}
+  .seg button{font-family:var(--mono);font-size:12px;background:transparent;color:var(--ink-2);
+    border:0;padding:7px 12px;cursor:pointer;border-right:1px solid var(--line-soft)}
+  .seg button:last-child{border-right:0}
+  .seg button[aria-pressed="true"]{background:var(--block-hi);color:var(--ink)}
+  .seg button:hover{color:var(--ink)}
+
+  .row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 0}
+  .row .info{min-width:0}
+  .row .info .n{font-size:13px}
+  .row .info .d{font-size:11.5px;color:var(--ink-3)}
+
+  .toggle{--w:42px;position:relative;width:var(--w);height:24px;flex:0 0 auto;background:var(--block);
+    border:1px solid var(--line);border-radius:999px;cursor:pointer;transition:background .18s}
+  .toggle::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;
+    background:var(--ink-3);transition:transform .18s,background .18s}
+  .toggle[aria-pressed="true"]{background:color-mix(in srgb, var(--accent,var(--msg)) 35%, var(--block))}
+  .toggle[aria-pressed="true"]::after{transform:translateX(18px);background:var(--accent,var(--msg))}
+
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+  .chip{font-family:var(--mono);font-size:11.5px;display:inline-flex;align-items:center;gap:7px;
+    padding:6px 8px 6px 11px;border:1px solid var(--line);border-radius:8px;background:var(--bg-2);color:var(--ink-2)}
+  .chip b{color:var(--ink);font-weight:400}
+  .chip .x{cursor:pointer;color:var(--ink-3);border:0;background:transparent;font-family:var(--mono);font-size:13px;padding:0 2px}
+  .chip .x:hover{color:#ff7a70}
+  .add-mcp{display:flex;gap:8px;margin-top:10px}
+  .add-mcp input{flex:1;background:var(--bg-2);border:1px solid var(--line);border-radius:8px;color:var(--ink);
+    font-family:var(--mono);font-size:12px;padding:7px 10px;outline:0}
+  .add-mcp input:focus{border-color:var(--tool)}
+  .add-mcp button{font-family:var(--mono);font-size:12px;background:var(--block);color:var(--ink);
+    border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer}
+  .add-mcp button:hover{background:var(--block-hi)}
+
+  /* ---------- assembled prompt (right) ---------- */
+  .assembled .panel-head{position:relative}
+  .view-toggle{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .view-toggle button{font-family:var(--mono);font-size:11px;background:transparent;color:var(--ink-2);
+    border:0;padding:6px 11px;cursor:pointer;border-right:1px solid var(--line-soft)}
+  .view-toggle button:last-child{border-right:0}
+  .view-toggle button[aria-pressed="true"]{background:var(--block-hi);color:var(--ink)}
+
+  .asm-body{padding:16px}
+
+  .layer{border:1px solid var(--line);border-radius:12px;margin-bottom:14px;overflow:hidden;
+    background:var(--panel-2)}
+  .layer:last-child{margin-bottom:0}
+  .layer-head{display:flex;align-items:center;gap:10px;padding:10px 13px;cursor:pointer;
+    border-bottom:1px solid transparent;user-select:none}
+  .layer-head:hover{background:rgba(255,255,255,.02)}
+  .layer-tab{writing-mode:vertical-rl;transform:rotate(180deg);font-family:var(--mono);font-size:10px;
+    letter-spacing:.12em;text-transform:uppercase;padding:2px 0}
+  .layer .badge{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);margin-left:auto;
+    border:1px solid var(--line);border-radius:999px;padding:3px 9px;white-space:nowrap}
+  .layer-title{font-family:var(--mono);font-size:12.5px;font-weight:700;letter-spacing:.02em}
+  .layer.tool .layer-title{color:var(--tool)} .layer.tool{box-shadow:inset 3px 0 0 var(--tool)}
+  .layer.sys  .layer-title{color:var(--sys)}  .layer.sys{box-shadow:inset 3px 0 0 var(--sys)}
+  .layer.msg  .layer-title{color:var(--msg)}  .layer.msg{box-shadow:inset 3px 0 0 var(--msg)}
+  .caret{margin-left:8px;color:var(--ink-3);font-family:var(--mono);font-size:11px;transition:transform .18s}
+  .layer.collapsed .caret{transform:rotate(-90deg)}
+  .layer.collapsed .layer-body{display:none}
+  .layer-body{padding:12px 13px}
+
+  .tile-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+  @media(max-width:520px){.tile-grid{grid-template-columns:repeat(2,1fr)}}
+  .tile{background:var(--block);border:1px solid var(--line-soft);border-radius:9px;padding:11px 12px;cursor:pointer;
+    transition:background .15s,transform .15s,border-color .15s}
+  .tile:hover{background:var(--block-hi);border-color:var(--line)}
+  .tile .tn{font-family:var(--mono);font-weight:700;font-size:13px}
+  .tile .tt{font-family:var(--mono);font-size:10px;color:var(--ink-3);margin-top:3px}
+  .tile.mcp .tn{color:var(--tool)}
+  .tile.full{grid-column:1/-1;cursor:pointer}
+
+  .sysblock{background:var(--block);border:1px solid var(--line-soft);border-radius:9px;padding:11px 13px;cursor:pointer;
+    font-family:var(--mono);font-size:12px;color:var(--ink-2);transition:background .15s}
+  .sysblock:hover{background:var(--block-hi)}
+  .sysblock + .sysblock{margin-top:9px}
+  .sysblock .k{color:var(--ink);display:block;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-3);margin-bottom:4px}
+  .sys-two{display:grid;grid-template-columns:1.5fr 1fr;gap:9px;margin-top:9px}
+  @media(max-width:520px){.sys-two{grid-template-columns:1fr}}
+  .sys-two .sysblock{margin-top:0}
+
+  .userwrap{border:1px solid var(--user);border-radius:11px;padding:11px;background:rgba(79,163,242,.04)}
+  .userwrap .ulabel{font-family:var(--mono);font-size:11px;color:var(--user);font-weight:700;margin-bottom:9px;display:flex;align-items:center;gap:8px}
+  .userwrap .ulabel .role{border:1px solid var(--user);border-radius:6px;padding:1px 7px;font-size:9.5px;letter-spacing:.1em}
+  .inj{background:var(--block);border:1px dashed var(--line);border-radius:9px;padding:10px 12px;cursor:pointer;transition:background .15s}
+  .inj:hover{background:var(--block-hi)}
+  .inj + .inj,.inj + .usermsg,.injrow + .usermsg{margin-top:9px}
+  .injrow{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  @media(max-width:520px){.injrow{grid-template-columns:1fr}}
+  .inj .it{font-family:var(--mono);font-size:12px;color:var(--ink);font-weight:700}
+  .inj .id{font-family:var(--mono);font-size:10px;color:var(--ink-3);margin-top:3px}
+  .usermsg{background:#10161e;border:1px solid var(--line);border-radius:9px;padding:12px 13px;
+    font-family:var(--mono);font-size:13px;color:var(--ink)}
+  .usermsg .echo{color:var(--ink)}
+  .usermsg.empty{color:var(--ink-3)}
+
+  /* pulse on rebuild */
+  @keyframes pulse{0%{box-shadow:inset 3px 0 0 var(--pc), 0 0 0 0 var(--pc)}
+    40%{box-shadow:inset 3px 0 0 var(--pc), 0 0 0 4px color-mix(in srgb,var(--pc) 22%,transparent)}
+    100%{box-shadow:inset 3px 0 0 var(--pc), 0 0 0 0 transparent}}
+  .layer.tool{--pc:var(--tool)} .layer.sys{--pc:var(--sys)} .layer.msg{--pc:var(--msg)}
+  .layer.flash{animation:pulse .7s ease}
+  @media (prefers-reduced-motion:reduce){ .layer.flash{animation:none} .toggle::after{transition:none} .caret{transition:none} }
+
+  /* ---------- raw view ---------- */
+  .raw{font-family:var(--mono);font-size:12px;line-height:1.7;white-space:pre-wrap;word-break:break-word;
+    background:#0c1118;border:1px solid var(--line);border-radius:11px;padding:15px;color:var(--ink-2);
+    max-height:560px;overflow:auto}
+  .raw .key{color:var(--msg)} .raw .str{color:var(--tool)} .raw .com{color:var(--ink-3)}
+  .raw .sys{color:var(--sys)} .raw .punc{color:var(--ink-3)}
+  .hidden{display:none !important}
+
+  /* ---------- token meter ---------- */
+  .meter{margin-top:18px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px}
+  .meter h3{margin:0 0 3px;font-size:13.5px;font-weight:600}
+  .meter .sub{margin:0 0 13px;font-size:12px;color:var(--ink-3)}
+  .meter .headline{font-family:var(--mono);font-size:13px;margin-bottom:12px;color:var(--ink-2)}
+  .meter .headline b{color:var(--ink)}
+  .meter .headline .big{color:var(--amber);font-size:16px}
+  .bar{height:30px;border-radius:8px;overflow:hidden;display:flex;border:1px solid var(--line);background:#0c1118}
+  .bar .seg-b{height:100%;display:flex;align-items:center;justify-content:center;font-family:var(--mono);
+    font-size:10px;color:#0a0d12;font-weight:700;transition:flex-basis .4s ease;overflow:hidden;white-space:nowrap;min-width:0}
+  .seg-b.t{background:var(--tool)} .seg-b.s{background:var(--sys)} .seg-b.m{background:var(--msg)} .seg-b.u{background:var(--amber)}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:11px;font-family:var(--mono);font-size:11px;color:var(--ink-2)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+
+  /* ---------- explainer drawer ---------- */
+  .explain{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:0;overflow:hidden}
+  .explain .eh{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line-soft)}
+  .explain .eh .pill{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+    padding:3px 9px;border-radius:999px}
+  .explain .eh h3{margin:0;font-size:15px;font-weight:600}
+  .explain .eb{padding:14px 16px;color:var(--ink-2);font-size:13.5px;max-width:74ch}
+  .explain .eb p{margin:0 0 10px}
+  .explain .eb p:last-child{margin:0}
+  .explain .eb code{font-family:var(--mono);font-size:12px;background:#0c1118;border:1px solid var(--line);
+    padding:1px 6px;border-radius:5px;color:var(--tool)}
+  .explain.empty .eb{color:var(--ink-3);font-style:italic}
+
+  /* ---------- footer ---------- */
+  footer{margin-top:34px;border-top:1px solid var(--line-soft);padding-top:18px;color:var(--ink-3);font-size:12.5px}
+  footer code{font-family:var(--mono);background:#0c1118;border:1px solid var(--line);padding:1px 6px;border-radius:5px;color:var(--ink-2)}
+  kbd{font-family:var(--mono);font-size:11px;background:var(--block);border:1px solid var(--line);border-bottom-width:2px;
+    border-radius:5px;padding:1px 6px;color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <!-- pixel crab mascot -->
+      <svg class="crab" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
+        <g fill="#8a5a3c">
+          <rect x="3" y="5" width="10" height="5"/><rect x="2" y="6" width="1" height="2"/><rect x="13" y="6" width="1" height="2"/>
+          <rect x="4" y="4" width="2" height="1"/><rect x="10" y="4" width="2" height="1"/>
+          <rect x="2" y="10" width="2" height="1"/><rect x="12" y="10" width="2" height="1"/>
+          <rect x="4" y="10" width="1" height="2"/><rect x="11" y="10" width="1" height="2"/>
+          <rect x="6" y="10" width="1" height="1"/><rect x="9" y="10" width="1" height="1"/>
+        </g>
+        <g fill="#2a1c12"><rect x="5" y="6" width="1" height="1"/><rect x="10" y="6" width="1" height="1"/></g>
+        <g fill="#a06a48"><rect x="4" y="3" width="1" height="1"/><rect x="11" y="3" width="1" height="1"/></g>
+      </svg>
+      <div class="title">
+        <h1>The <span class="accent">Assembled&nbsp;Prompt</span></h1>
+        <p>You type one line. The model receives a few thousand tokens. Change the session below and watch Claude Code rebuild the real payload, live.</p>
+      </div>
+    </div>
+    <div class="hdr-tag">interactive · single-file · no build step</div>
+  </header>
+
+  <div class="grid">
+
+    <!-- ============ LEFT: terminal + controls ============ -->
+    <div>
+      <section class="panel term" aria-label="Terminal">
+        <div class="bar">
+          <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+          <span class="path" id="tpath">~/Desktop/frontend-masters</span>
+        </div>
+        <div class="term-body">
+          <div class="session">
+            <svg class="crab2" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
+              <g fill="#8a5a3c"><rect x="3" y="5" width="10" height="5"/><rect x="2" y="6" width="1" height="2"/><rect x="13" y="6" width="1" height="2"/><rect x="4" y="4" width="2" height="1"/><rect x="10" y="4" width="2" height="1"/><rect x="2" y="10" width="2" height="1"/><rect x="12" y="10" width="2" height="1"/><rect x="4" y="10" width="1" height="2"/><rect x="11" y="10" width="1" height="2"/></g>
+              <g fill="#2a1c12"><rect x="5" y="6" width="1" height="1"/><rect x="10" y="6" width="1" height="1"/></g>
+            </svg>
+            <div class="meta">
+              Claude Code v2.1.x<br>
+              <b id="tmodel">Opus 4.7 · xhigh effort · Claude Max</b><br>
+              <b id="tcwd">~/Desktop/frontend-masters</b>
+            </div>
+          </div>
+          <div class="prompt-line">
+            <span class="chev">&rsaquo;</span>
+            <input id="msg" type="text" value="Add a test for calc in utils.ts" aria-label="Your message to Claude Code" autocomplete="off" spellcheck="false">
+          </div>
+          <div class="send-hint">
+            <span>type to edit your message</span>
+            <span>everything above this line is sent <em>every turn</em></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel controls" aria-label="Session controls">
+        <div class="ctrl-grp">
+          <h3>Model &amp; effort</h3>
+          <p class="sub">Shown in the banner. Doesn't change the payload shape — just the header context.</p>
+          <div class="seg" role="group" aria-label="Model">
+            <button data-model="Opus 4.7 · xhigh effort · Claude Max" aria-pressed="true">Opus · xhigh</button>
+            <button data-model="Sonnet 4.6 · high effort · Claude Max" aria-pressed="false">Sonnet · high</button>
+            <button data-model="Haiku 4.5 · medium effort · Pro" aria-pressed="false">Haiku · med</button>
+          </div>
+        </div>
+
+        <div class="ctrl-grp">
+          <h3>Project context</h3>
+          <p class="sub">These get injected into your <em>first</em> user message — not the system prompt.</p>
+          <div class="row">
+            <div class="info"><div class="n">CLAUDE.md exists</div><div class="d">project memory / house rules at repo root</div></div>
+            <button class="toggle" id="t-claudemd" style="--accent:var(--msg)" aria-pressed="true" aria-label="Toggle CLAUDE.md"></button>
+          </div>
+          <div class="row">
+            <div class="info"><div class="n">Advertise available skills</div><div class="d">name + description only, loaded on demand</div></div>
+            <button class="toggle" id="t-skills" style="--accent:var(--msg)" aria-pressed="true" aria-label="Toggle skills"></button>
+          </div>
+        </div>
+
+        <div class="ctrl-grp">
+          <h3>Built-in tools</h3>
+          <p class="sub">Each enabled tool ships its full JSON schema in every request.</p>
+          <div class="chips" id="toolchips"></div>
+        </div>
+
+        <div class="ctrl-grp">
+          <h3>MCP servers</h3>
+          <p class="sub">Each connected server expands into namespaced <code style="font-family:var(--mono);font-size:11px;color:var(--tool)">mcp__server__tool</code> schemas.</p>
+          <div class="chips" id="mcpchips"></div>
+          <div class="add-mcp">
+            <input id="mcpname" type="text" placeholder="add a server… e.g. github, sentry" autocomplete="off" spellcheck="false">
+            <button id="mcpadd">Connect</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ============ RIGHT: assembled prompt ============ -->
+    <div>
+      <section class="panel assembled" aria-label="Assembled prompt">
+        <div class="panel-head">
+          <span class="lbl">Assembled Prompt</span>
+          <div class="view-toggle" role="group" aria-label="View mode">
+            <button id="v-rendered" aria-pressed="true">Rendered</button>
+            <button id="v-raw" aria-pressed="false">Raw payload</button>
+          </div>
+        </div>
+        <div class="asm-body">
+          <div id="rendered"></div>
+          <div id="rawview" class="raw hidden"></div>
+        </div>
+      </section>
+
+      <section class="meter" aria-label="Token weight">
+        <h3>Where the tokens go</h3>
+        <p class="sub">Rough estimate of what the model reads on this turn. The bar is to scale.</p>
+        <div class="headline" id="meter-headline"></div>
+        <div class="bar" id="meterbar"></div>
+        <div class="legend">
+          <span><i style="background:var(--tool)"></i>Tool schema</span>
+          <span><i style="background:var(--sys)"></i>System prompt</span>
+          <span><i style="background:var(--msg)"></i>Injected context</span>
+          <span><i style="background:var(--amber)"></i>Your message</span>
+        </div>
+      </section>
+
+      <section class="explain empty" id="explain" aria-live="polite">
+        <div class="eh">
+          <span class="pill" id="ex-pill" style="background:var(--block);color:var(--ink-2)">Inspector</span>
+          <h3 id="ex-title">Click any block to inspect it</h3>
+        </div>
+        <div class="eb" id="ex-body">
+          <p>Every box on the left of the diagram is a real part of the request. Tap a tool, the system prompt, an injected file, or your message to read what it is and why Claude Code puts it there.</p>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <footer>
+    <p style="margin:0 0 8px"><b style="color:var(--ink-2)">Note on the numbers.</b> Token counts are illustrative estimates to show <em>relative</em> weight, not exact values from the real client — the lesson is the proportion, not the digits.</p>
+    <p style="margin:0">Deploy: save this file as <code>index.html</code>, push to a repo, enable <b style="color:var(--ink-2)">Settings → Pages → Deploy from branch</b>. Press <kbd>R</kbd> to reset the session.</p>
+  </footer>
+</div>
+
+<script>
+"use strict";
+(function(){
+  // ---------- data ----------
+  const TOOLS = [
+    {id:'bash',     name:'Bash',     desc:'Run shell commands',           tok:360},
+    {id:'edit',     name:'Edit',     desc:'Targeted edits to a file',     tok:430},
+    {id:'read',     name:'Read',     desc:'Read file contents',           tok:300},
+    {id:'agent',    name:'Agent',    desc:'Dispatch a sub-agent',         tok:380},
+    {id:'webfetch', name:'WebFetch', desc:'Fetch and read a URL',         tok:280},
+    {id:'write',    name:'Write',    desc:'Create / overwrite a file',    tok:300},
+  ];
+  const TOK = { sysIdentity:520, env:140, tone:180, claudeMd:430, skills:190, perMcpServer:240, mcpToolsAvg:8 };
+
+  const state = {
+    message: "Add a test for calc in utils.ts",
+    model: "Opus 4.7 · xhigh effort · Claude Max",
+    cwd: "~/Desktop/frontend-masters",
+    claudeMd: true,
+    skills: true,
+    enabled: Object.fromEntries(TOOLS.map(t=>[t.id,true])),
+    mcp: [ {name:'github', tools:8}, {name:'linear', tools:6} ],
+    view: 'rendered',
+    collapsed: {},
+  };
+
+  // ---------- token math ----------
+  function userMsgTokens(){ const w=state.message.trim()?state.message.trim().split(/\s+/).length:0; return Math.max(0, Math.round(w*1.35)); }
+  function toolTokens(){ let t=TOOLS.filter(x=>state.enabled[x.id]).reduce((s,x)=>s+x.tok,0);
+    state.mcp.forEach(m=>{ t += TOK.perMcpServer + m.tools*TOK.mcpToolsAvg; }); return t; }
+  function sysTokens(){ return TOK.sysIdentity + TOK.env + TOK.tone; }
+  function injectedTokens(){ return (state.claudeMd?TOK.claudeMd:0) + (state.skills?TOK.skills:0); }
+  function totalTokens(){ return toolTokens()+sysTokens()+injectedTokens()+userMsgTokens(); }
+
+  // ---------- explanations ----------
+  const EX = {
+    intro:{pill:'Inspector', color:'var(--ink-2)', title:'Click any block to inspect it',
+      body:`<p>Every box here is a real part of the request. Tap a tool, the system prompt, an injected file, or your message to read what it is and why it's there.</p>`},
+    toolschema:{pill:'Tool schema', color:'var(--tool)', title:'Tool schema',
+      body:`<p>Before the conversation even starts, Claude Code hands the model a full JSON spec for every tool it's allowed to call — names, descriptions, and the exact shape of each parameter.</p>
+      <p>This is sent on <b>every single turn</b>, not just the first. Six built-in tools plus a couple of MCP servers can easily be the heaviest part of the request — often heavier than your actual message by 100×.</p>
+      <p>Fewer enabled tools and fewer connectors = a leaner, faster, cheaper request.</p>`},
+    tool:{pill:'Tool', color:'var(--tool)', title:'',
+      body:''},
+    mcp:{pill:'MCP tools', color:'var(--tool)', title:'MCP server tools',
+      body:`<p>Connectors (Model Context Protocol servers) don't appear as one tool — each server expands into many. A tool is exposed to the model namespaced as <code>mcp__server__toolname</code> so names never collide.</p>
+      <p>That's why a single "github" connector can quietly add a dozen tool schemas to the payload. Connect only what the task needs.</p>`},
+    systemprompt:{pill:'System prompt', color:'var(--sys)', title:'System prompt',
+      body:`<p>The instruction layer that defines the assistant's identity and rules: <code>You are Claude Code, Anthropic's CLI…</code>, how to use tools, safety boundaries, output conventions.</p>
+      <p>It's stable for the whole session and the model treats it as higher-priority than anything in the conversation. Notably, your project files do <b>not</b> live here.</p>`},
+    environment:{pill:'System prompt', color:'var(--sys)', title:'Environment',
+      body:`<p>A small dynamic block stitched into the system prompt: current working directory, OS/platform, today's date, and often whether the directory is a git repo and which branch you're on.</p>
+      <p>This is how Claude can reason about <i>your</i> machine without you spelling it out every time.</p>`},
+    tone:{pill:'System prompt', color:'var(--sys)', title:'Tone & style',
+      body:`<p>Rules about how to respond in a terminal: be concise, prefer doing over explaining, format for a CLI, avoid needless preamble. It's why Claude Code is terse compared to the chat product.</p>`},
+    messages:{pill:'Messages', color:'var(--msg)', title:'Messages',
+      body:`<p>The actual conversation array — the back-and-forth turns. It grows as you and the model exchange messages and tool results.</p>
+      <p>The subtle part: your <b>first</b> user turn isn't just what you typed. Claude Code wraps extra context around it before sending.</p>`},
+    user1:{pill:'Messages · user', color:'var(--msg)', title:'User turn #1',
+      body:`<p>This single message object is what the model sees as "the user speaking" for the first time. It's assembled from several pieces — injected context first, then the line you actually typed.</p>
+      <p>So when people say "Claude already knew my repo conventions," this is the mechanism: it was pasted in here, invisibly.</p>`},
+    claudemd:{pill:'Injected · context', color:'var(--msg)', title:'CLAUDE.md',
+      body:`<p>If a <code>CLAUDE.md</code> exists at the repo root (or in parent dirs / your home config), its contents are injected into the first user message as project memory: coding conventions, commands, do's and don'ts.</p>
+      <p>Key insight: it lands in the <b>messages</b>, not the system prompt. It's context the model reads as part of the conversation, which is why you can override or discuss it.</p>`},
+    skills:{pill:'Injected · context', color:'var(--msg)', title:'Available skills',
+      body:`<p>Only the <b>name and one-line description</b> of each skill is advertised up front — a cheap menu. The full instructions for a skill are loaded later, on demand, only if the model decides to use it.</p>
+      <p>This "progressive disclosure" keeps the base payload small while still letting the model know what specialized abilities exist.</p>`},
+    usermsg:{pill:'Injected · your input', color:'var(--amber)', title:'Your typed message',
+      body:`<p>This is the only part you actually wrote. In a fresh session it's often the smallest slice of the whole request — a handful of tokens riding on top of a few thousand tokens of scaffolding.</p>
+      <p>That ratio is the whole point of this playground: <b>you write the tip; the client assembles the iceberg.</b></p>`},
+  };
+
+  // ---------- DOM ----------
+  const $ = s=>document.querySelector(s);
+  const rendered = $('#rendered'), rawview = $('#rawview');
+  const exEl = $('#explain'), exPill = $('#ex-pill'), exTitle = $('#ex-title'), exBody = $('#ex-body');
+
+  function setExplain(key, override){
+    let e = EX[key]; if(!e) return;
+    let title = override && override.title ? override.title : e.title;
+    let body  = override && override.body  ? override.body  : e.body;
+    exEl.classList.remove('empty');
+    exPill.textContent = e.pill; exPill.style.background='var(--block)'; exPill.style.color=e.color;
+    exTitle.textContent = title; exBody.innerHTML = body;
+    if(window.matchMedia && !matchMedia('(prefers-reduced-motion: reduce)').matches){
+      exEl.scrollIntoView({behavior:'smooth', block:'nearest'});
+    }
+  }
+
+  // ---------- render: control chips ----------
+  function renderToolChips(){
+    const c = $('#toolchips'); c.innerHTML='';
+    TOOLS.forEach(t=>{
+      const b=document.createElement('button');
+      b.className='chip'; b.style.cursor='pointer';
+      b.style.opacity = state.enabled[t.id] ? '1' : '.45';
+      b.innerHTML = `<span class="toggle" style="--accent:var(--tool);transform:scale(.62);margin:-4px -6px -4px -8px" aria-hidden="true"></span><b>${t.name}</b>`;
+      b.querySelector('.toggle').setAttribute('aria-pressed', state.enabled[t.id]);
+      b.setAttribute('aria-pressed', state.enabled[t.id]);
+      b.title = state.enabled[t.id] ? 'Click to disable' : 'Click to enable';
+      b.addEventListener('click',()=>{ state.enabled[t.id]=!state.enabled[t.id]; renderToolChips(); rebuild('tool'); });
+      c.appendChild(b);
+    });
+  }
+  function renderMcpChips(){
+    const c = $('#mcpchips'); c.innerHTML='';
+    if(!state.mcp.length){ c.innerHTML='<span style="font-family:var(--mono);font-size:11.5px;color:var(--ink-3)">no servers connected</span>'; }
+    state.mcp.forEach((m,i)=>{
+      const el=document.createElement('span'); el.className='chip';
+      el.innerHTML = `<b>${m.name}</b> <span style="color:var(--ink-3)">${m.tools} tools</span> <button class="x" aria-label="Disconnect ${m.name}">×</button>`;
+      el.querySelector('.x').addEventListener('click',()=>{ state.mcp.splice(i,1); renderMcpChips(); rebuild('tool'); });
+      c.appendChild(el);
+    });
+  }
+
+  // ---------- render: assembled (rendered) ----------
+  function layerHead(cls,tab,title,badge){
+    const collapsed = state.collapsed[cls] ? ' collapsed':'';
+    return `<div class="layer ${cls}${collapsed}" data-layer="${cls}">
+      <div class="layer-head" data-toggle="${cls}">
+        <span class="layer-tab" style="color:var(--${cls==='tool'?'tool':cls==='sys'?'sys':'msg'})">${tab}</span>
+        <span class="layer-title">${title}</span>
+        <span class="badge">${badge}</span>
+        <span class="caret">▼</span>
+      </div>
+      <div class="layer-body">`;
+  }
+
+  function renderRendered(flashCls){
+    const enabledTools = TOOLS.filter(t=>state.enabled[t.id]);
+    let toolTiles = enabledTools.map(t=>`<button class="tile" data-ex="tool" data-tid="${t.id}"><div class="tn">${t.name}</div><div class="tt">${t.desc}</div></button>`).join('');
+    let mcpTiles = state.mcp.map(m=>`<button class="tile mcp" data-ex="mcp"><div class="tn">mcp_${m.name}__*</div><div class="tt">${m.tools} tools</div></button>`).join('');
+    const toolCount = enabledTools.length + state.mcp.reduce((s,m)=>s+m.tools,0);
+
+    const html = `
+    ${layerHead('tool','Tool Schema','Tool Schema', toolCount+' tools · ~'+fmt(toolTokens())+' tok')}
+        <div class="tile-grid">${toolTiles || '<div class="tt" style="font-family:var(--mono);color:var(--ink-3);grid-column:1/-1">all tools disabled</div>'}${mcpTiles}</div>
+      </div>
+    </div>
+
+    ${layerHead('sys','System Prompt','System Prompt','~'+fmt(sysTokens())+' tok')}
+        <button class="sysblock" data-ex="systemprompt" style="width:100%;text-align:left"><span class="k">identity</span>You are Claude Code, Anthropic's CLI for agentic coding…</button>
+        <div class="sys-two">
+          <button class="sysblock" data-ex="environment" style="text-align:left"><span class="k">environment</span>cwd ${esc(state.cwd)} · darwin · git: main · ${today()}</button>
+          <button class="sysblock" data-ex="tone" style="text-align:left"><span class="k">tone</span>Be concise. Do, don't explain. Format for a terminal.</button>
+        </div>
+      </div>
+    </div>
+
+    ${layerHead('msg','Messages','Messages','1 turn · ~'+fmt(injectedTokens()+userMsgTokens())+' tok')}
+        <div class="userwrap">
+          <div class="ulabel"><span class="role">USER 1</span> assembled first turn</div>
+          ${ (state.claudeMd||state.skills) ? `<div class="injrow">
+            ${state.claudeMd?`<button class="inj" data-ex="claudemd"><div class="it">CLAUDE.md</div><div class="id">project memory · if exists</div></button>`:''}
+            ${state.skills?`<button class="inj" data-ex="skills"><div class="it">Available skills</div><div class="id">name + description only</div></button>`:''}
+          </div>`:'' }
+          <button class="usermsg ${state.message.trim()?'':'empty'}" data-ex="usermsg" style="display:block;width:100%;text-align:left;cursor:pointer">${state.message.trim()? '<span class="echo">'+esc(state.message)+'</span>' : '(type a message in the terminal above)'}</button>
+        </div>
+      </div>
+    </div>`;
+    rendered.innerHTML = html;
+
+    // wire layer collapse
+    rendered.querySelectorAll('[data-toggle]').forEach(h=>{
+      h.addEventListener('click',(e)=>{ if(e.target.closest('[data-ex]'))return;
+        const k=h.getAttribute('data-toggle'); state.collapsed[k]=!state.collapsed[k];
+        h.closest('.layer').classList.toggle('collapsed'); });
+    });
+    // wire inspectors
+    rendered.querySelectorAll('[data-ex]').forEach(el=>{
+      el.addEventListener('click',(e)=>{ e.stopPropagation();
+        const key=el.getAttribute('data-ex');
+        if(key==='tool'){ const t=TOOLS.find(x=>x.id===el.getAttribute('data-tid'));
+          setExplain('tool',{title:t.name+' — built-in tool',
+            body:`<p><b>${t.name}</b>: ${t.desc.toLowerCase()}.</p><p>Like every tool, its complete parameter schema (~${t.tok} tokens here) is sent to the model on each turn so it knows exactly how to call it. Toggle it off in the controls to drop that weight.</p>`});
+        } else setExplain(key);
+        markActive(el);
+      });
+    });
+    // also let layer titles open the section explainer
+    rendered.querySelector('.layer.tool .layer-title').addEventListener('click',(e)=>{e.stopPropagation();setExplain('toolschema');});
+    rendered.querySelector('.layer.sys .layer-title').addEventListener('click',(e)=>{e.stopPropagation();setExplain('systemprompt');});
+    rendered.querySelector('.layer.msg .layer-title').addEventListener('click',(e)=>{e.stopPropagation();setExplain('messages');});
+
+    if(flashCls){ const L=rendered.querySelector('.layer.'+flashCls); if(L){ L.classList.remove('flash'); void L.offsetWidth; L.classList.add('flash'); } }
+  }
+
+  function markActive(el){
+    rendered.querySelectorAll('[data-ex]').forEach(x=>x.style.outline='');
+    el.style.outline='1px solid '+ (el.closest('.layer.tool')?'var(--tool)':el.closest('.layer.sys')?'var(--sys)':'var(--msg)');
+    el.style.outlineOffset='1px';
+  }
+
+  // ---------- render: raw ----------
+  function renderRaw(){
+    const enabledTools = TOOLS.filter(t=>state.enabled[t.id]);
+    const toolNames = enabledTools.map(t=>t.name).concat(state.mcp.flatMap(m=>[`mcp__${m.name}__*`]));
+    const injected = [];
+    if(state.claudeMd) injected.push('  <system-reminder> contents of CLAUDE.md … </system-reminder>');
+    if(state.skills)   injected.push('  <available-skills> name + description of each skill … </available-skills>');
+    const userContent = injected.concat(['  '+ (state.message.trim()||'(empty)')]).join('\n');
+
+    const html =
+`<span class="com">// POST /v1/messages  — what the client actually sends</span>
+{
+  <span class="key">"model"</span>: <span class="str">"${state.model.split(' · ')[0].toLowerCase().replace(/\s+/g,'-')}"</span>,
+  <span class="com">// ── system prompt ─────────────────── ~${fmt(sysTokens())} tok</span>
+  <span class="key">"system"</span>: <span class="sys">"You are Claude Code, Anthropic's CLI…\\n
+            &lt;env&gt; cwd:${esc(state.cwd)} platform:darwin date:${today()} git:main &lt;/env&gt;\\n
+            Be concise. Prefer doing over explaining."</span>,
+  <span class="com">// ── tool schema ───────────────────── ~${fmt(toolTokens())} tok  (${toolNames.length} tools)</span>
+  <span class="key">"tools"</span>: [
+${toolNames.map(n=>`    { <span class="key">"name"</span>: <span class="str">"${n}"</span>, <span class="key">"input_schema"</span>: { … } }`).join(',\n')}
+  ],
+  <span class="com">// ── messages ──────────────────────── ~${fmt(injectedTokens()+userMsgTokens())} tok</span>
+  <span class="key">"messages"</span>: [
+    {
+      <span class="key">"role"</span>: <span class="str">"user"</span>,
+      <span class="key">"content"</span>: <span class="str">"""</span>
+${userContent.split('\n').map(l=>'      '+esc(l)).join('\n')}
+      <span class="str">"""</span>
+    }
+  ]
+}
+<span class="com">// total ≈ ${fmt(totalTokens())} tokens   ·   you typed ≈ ${fmt(userMsgTokens())} tokens (${pctUser()}%)</span>`;
+    rawview.innerHTML = html;
+  }
+
+  // ---------- render: meter ----------
+  function renderMeter(){
+    const t=toolTokens(), s=sysTokens(), inj=injectedTokens(), u=userMsgTokens(), total=Math.max(1,t+s+inj+u);
+    const bar=$('#meterbar');
+    const seg=(cls,val,label)=>`<div class="seg-b ${cls}" style="flex-basis:${(val/total*100).toFixed(2)}%" title="${label}: ~${fmt(val)} tok">${val/total>0.07?fmt(val):''}</div>`;
+    bar.innerHTML = seg('t',t,'Tool schema')+seg('s',s,'System prompt')+seg('m',inj,'Injected context')+seg('u',u,'Your message');
+    $('#meter-headline').innerHTML =
+      `You typed <b>~${fmt(u)}</b> tokens. The model receives <span class="big">~${fmt(total)}</span> tokens — your words are <b>${pctUser()}%</b> of the request.`;
+  }
+
+  function pctUser(){ const u=userMsgTokens(), tot=Math.max(1,totalTokens()); return (u/tot*100).toFixed(u/tot<0.1?1:0); }
+
+  // ---------- helpers ----------
+  function fmt(n){ return n.toLocaleString('en-US'); }
+  function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function today(){ return new Date().toISOString().slice(0,10); }
+
+  // ---------- rebuild ----------
+  function rebuild(flashCls){
+    if(state.view==='rendered'){ renderRendered(flashCls); rendered.classList.remove('hidden'); rawview.classList.add('hidden'); }
+    else { renderRaw(); rawview.classList.remove('hidden'); rendered.classList.add('hidden'); }
+    renderMeter();
+  }
+
+  // ---------- events ----------
+  $('#msg').addEventListener('input', e=>{ state.message=e.target.value; rebuild('msg'); });
+
+  document.querySelectorAll('[data-model]').forEach(b=>{
+    b.addEventListener('click',()=>{
+      document.querySelectorAll('[data-model]').forEach(x=>x.setAttribute('aria-pressed','false'));
+      b.setAttribute('aria-pressed','true'); state.model=b.getAttribute('data-model');
+      $('#tmodel').textContent=state.model; rebuild('sys');
+    });
+  });
+
+  function bindToggle(id, key, flash){
+    const el=$(id);
+    el.addEventListener('click',()=>{ state[key]=!state[key]; el.setAttribute('aria-pressed',state[key]); rebuild(flash); });
+  }
+  bindToggle('#t-claudemd','claudeMd','msg');
+  bindToggle('#t-skills','skills','msg');
+
+  $('#mcpadd').addEventListener('click', addMcp);
+  $('#mcpname').addEventListener('keydown', e=>{ if(e.key==='Enter') addMcp(); });
+  function addMcp(){
+    const inp=$('#mcpname'); const name=inp.value.trim().toLowerCase().replace(/[^a-z0-9_-]/g,'');
+    if(!name) return;
+    if(state.mcp.some(m=>m.name===name)){ inp.value=''; return; }
+    state.mcp.push({name, tools: 4+Math.floor(Math.random()*9)}); inp.value='';
+    renderMcpChips(); rebuild('tool');
+  }
+
+  $('#v-rendered').addEventListener('click',()=>switchView('rendered'));
+  $('#v-raw').addEventListener('click',()=>switchView('raw'));
+  function switchView(v){ state.view=v;
+    $('#v-rendered').setAttribute('aria-pressed', v==='rendered');
+    $('#v-raw').setAttribute('aria-pressed', v==='raw');
+    rebuild();
+  }
+
+  document.addEventListener('keydown', e=>{
+    if(e.key.toLowerCase()==='r' && !/input|textarea/i.test(document.activeElement.tagName)){
+      state.message="Add a test for calc in utils.ts"; $('#msg').value=state.message;
+      state.model="Opus 4.7 · xhigh effort · Claude Max"; $('#tmodel').textContent=state.model;
+      document.querySelectorAll('[data-model]').forEach((x,i)=>x.setAttribute('aria-pressed', i===0));
+      state.claudeMd=true; $('#t-claudemd').setAttribute('aria-pressed',true);
+      state.skills=true; $('#t-skills').setAttribute('aria-pressed',true);
+      state.enabled=Object.fromEntries(TOOLS.map(t=>[t.id,true]));
+      state.mcp=[{name:'github',tools:8},{name:'linear',tools:6}];
+      renderToolChips(); renderMcpChips(); rebuild('tool');
+    }
+  });
+
+  // ---------- init ----------
+  renderToolChips(); renderMcpChips(); rebuild();
+  setExplain('intro');
+})();
+</script>
+</body>
+</html>
